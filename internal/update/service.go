@@ -68,7 +68,10 @@ func (s *Service) lookupIPsResilient(ctx context.Context, hostname string, tries
 			for range tries {
 				ips, err := s.resolver.LookupNetIP(ctx, network, hostname)
 				if err != nil {
-					if strings.HasSuffix(err.Error(), "no such host") {
+					meansNoAddr := false
+					meansNoAddr = meansNoAddr || strings.HasSuffix(err.Error(), "no such host")
+					meansNoAddr = meansNoAddr || strings.HasSuffix(err.Error(), "no suitable address found")
+					if meansNoAddr {
 						results <- result{network: network} // no IP address for this network
 						return
 					}
@@ -77,6 +80,9 @@ func (s *Service) lookupIPsResilient(ctx context.Context, hostname string, tries
 				results <- result{network: network, ips: ips, err: err}
 				return
 			}
+			err := fmt.Errorf("ran out of tries for %s", network)
+			results <- result{network: network, err: err}
+			return
 		}(lookupCtx, network, results)
 	}
 
